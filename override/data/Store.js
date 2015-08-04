@@ -75,6 +75,68 @@ Ext.define('App.override.data.Store', {
             this.abort();
             this.loadPage(1);
         }
+    },
+
+    search: function(query, fields) {
+        var terms,
+            regexps = [];
+
+        // convert the fields to array if a string was passed
+        if ( ! Ext.isArray(fields)) {
+            fields = [fields];
+        }
+
+        // Spit value to get multiple terms
+        terms = query.split(' ');
+
+        // Convert each search string into regex
+        Ext.each(terms, function(term) {
+            // Ensure term is not space and at least 2 characters
+            if (term && term.length > 1) {
+                regexps.push(new RegExp(term, 'i')); // Case-insensitive regex
+            }
+        });
+
+        return this.getSearchResult(regexps, fields);
+    },
+
+    getSearchResult: function(regexps, fields) {
+        var me = this,
+            matches, match;
+
+        return me.queryBy(function(record) {
+
+            matches = [];
+
+            Ext.each(regexps, function(regex) {
+                match =  me.searchFieldsForRecord(record, fields, regex);
+                matches.push(match);
+            });
+
+            // If nothing was found, do not show anything
+            if (me.noSearchMatches(regexps, matches)) {
+                return false;
+            }
+
+            return matches[0];
+        });
+    },
+
+    searchFieldsForRecord: function(record, fields, query) {
+        var len = fields.length,
+            i = 0,
+            match;
+
+        for (; i < len; i++) {
+            match = record.get(fields[i]).match(query);
+            if (match) break;
+        }
+
+        return match;
+    },
+
+    noSearchMatches: function(regexps, matches) {
+        return regexps.length > 1 && matches.indexOf(false) != -1;
     }
     
 });
