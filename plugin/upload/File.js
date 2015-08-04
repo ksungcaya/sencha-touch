@@ -2,7 +2,11 @@ Ext.define('Ext.ux.upload.File', {
     extend: 'Ext.Component',
     xtype : 'uploadfile',
     alias : 'widget.uploadfile',
-    requires: ['Ext.Ajax', 'Ext.device.Notification'],
+    requires: [
+        'Ext.Ajax',
+        'Ext.device.Notification',
+        'Ext.LoadMask'
+    ],
     
     template: [
         {
@@ -76,26 +80,82 @@ Ext.define('Ext.ux.upload.File', {
      * Render the image on the view.
      * 
      * @param  {File object} imageFile
-     * @return {mixed}
+     * 
+     * @return {Void}
      */
     renderImage: function(imageFile) {
         var me = this;
 
-        if ( ! window.FileReader) {
-            return this.renderNoPreview();
+        if (window.loadImage) {
+            return me.renderByLoadImage(imageFile);
         }
 
+        if (window.FileReader) {
+            return me.renderByFileReader(imageFile);
+        }
+
+        return me.renderNoPreview();
+    },
+
+    /**
+     * Render the image using Load Image plugin.
+     *
+     * @param  {File object} imageFile
+     *
+     * @return {Void}
+     */
+    renderByLoadImage: function(imageFile) {
+        var me = this,
+            loadImage = window.loadImage,
+            loadOpts = { canvas: true };
+
+        // Use the "JavaScript Load Image" functionality to parse the file data
+        loadImage.parseMetaData(imageFile, function(data) {
+
+            // Get the correct orientation setting from the EXIF Data
+            if (data.exif) {
+                loadOpts.orientation = data.exif.get('Orientation');
+            }
+
+            // Load the image from disk and inject it into the DOM with the correct orientation
+            loadImage(imageFile,  function(canvas) {
+                    me.renderImageUri(canvas.toDataURL());
+                },loadOpts
+            );
+        });
+    },
+
+    /**
+     * Render the image using File Reader.
+     *
+     * @param  {File object} imageFile
+     *
+     * @return {Void}
+     */
+    renderByFileReader: function(imageFile) {
         var reader = new FileReader();
 
         reader.onloadend = function(e) {
-            // me.preview.setHtml('<img src="' + this.result + '">');
-            me.preview.dom.style.backgroundImage = 'url("' + this.result + '")';
-            me.preview.dom.style.backgroundSize = 'cover';
-            me.preview.dom.style.backgroundRepeat = 'no-repeat';
-            me.preview.dom.style.backgroundPosition = 'center center';
+            me.renderImageUri(this.result);
         };
 
-        return reader.readAsDataURL(imageFile);
+        reader.readAsDataURL(imageFile);
+    },
+
+    /**
+     * Render the data URI on the preview
+     *
+     * @param  {string} dataUri
+     *
+     * @return {void}
+     */
+    renderImageUri: function(dataUri) {
+        var preview = this.preview;
+
+        preview.dom.style.backgroundImage = 'url("' + dataUri + '")';
+        preview.dom.style.backgroundSize = 'cover';
+        preview.dom.style.backgroundRepeat = 'no-repeat';
+        preview.dom.style.backgroundPosition = 'center center';
     },
 
     /**
